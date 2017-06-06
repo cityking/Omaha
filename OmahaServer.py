@@ -109,7 +109,8 @@ def compare_result(players):
         if Omaha_compare.compare(player.card_type, max_players[0].card_type) > 0:
             max_players = [player]
         elif Omaha_compare.compare(player.card_type, max_players[0].card_type) == 0:
-            max_players.append(player)
+            if player not in max_players:
+                max_players.append(player)
              
 
     return max_players
@@ -206,7 +207,7 @@ class Server(object):
             while True:
                 if table.send_public:
                     cards_info = player.public_cards[4:]
-                    send_data = {'status':11, 'public_five':cards_info}
+                    send_data = {'status':12, 'public_five':cards_info}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
                     if player.player_no == table.first_player:
@@ -226,9 +227,6 @@ class Server(object):
                             if not current.discard:
                                 current_players.append(current)
                         win_players = compare_result(current_players)
-                        print(win_players)
-                        print(len(win_players))
-                        print(table.total_bet)
                         win_money_per_player = table.total_bet/len(win_players)    
                         table.win = win_players
 
@@ -236,19 +234,17 @@ class Server(object):
                         for player in table.players:
                             if player in table.win:
                                 money = win_money_per_player - player.bet_money
-                            else:
-                                money = -player.bet_money
-                            if money > 0:
                                 is_win = True 
-                            else:
-                                is_win = False 
-                            max_type = 'high'
-                            for card_type in player.card_type.keys():
-                                if grades[card_type] > grades[max_type]:
-                                    max_type = card_type
-                            result = {'player_no':player.player_no, 'card_type':{max_type:str(player.card_type[max_type])}, 'money':money, 'is_win':is_win}
-                            results.append(result)
-                        send_data = {'status':12, 'data':results}
+
+                                max_type = 'high'
+                                for card_type in player.card_type.keys():
+                                    if grades[card_type] > grades[max_type]:
+                                        max_type = card_type
+                                cards = trans_cards(player.card_type[max_type])        
+
+                                result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
+                                results.append(result)
+                        send_data = {'status':13, 'data':results}
                         send_data = json.dumps(send_data)+'\n'
                         conn.send(send_data.encode('utf-8'))
  
@@ -262,18 +258,18 @@ class Server(object):
                             for player in table.players:
                                 if player in table.win:
                                     money = win_money_per_player - player.bet_money
-                                else:
-                                    money = -player.bet_money
-                                if money > 0:
                                     is_win = True 
-                                else:
-                                    is_win = False 
-                                max_type = 'high'
-                                for card_type in player.card_type.keys():
-                                    if grades[card_type] > grades[max_type]:
-                                        max_type = card_type
-                                result = {'player_no':player.player_no, 'card_type':{max_type:str(player.card_type[max_type])}, 'money':money, 'is_win':is_win}
-                                results.append(result)
+    
+                                    max_type = 'high'
+                                    for card_type in player.card_type.keys():
+                                        if grades[card_type] > grades[max_type]:
+                                            max_type = card_type
+                                    cards = trans_cards(player.card_type[max_type])        
+    
+                                    result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
+     
+
+                                    results.append(result)
                             send_data = {'status':12, 'data':results}
                             send_data = json.dumps(send_data)+'\n'
                             conn.send(send_data.encode('utf-8'))
@@ -384,9 +380,14 @@ class Server(object):
                 if data == '1':
                     player.discard = True
                     player.bet = False
+                    player.current_bet = 0
                     table.circles += 1
                     next_player.bet = True
                     table.players_count -= 1
+                    send_data = {'player_no':player.player_no,'status':6, 'bet_money':player.current_bet, 'money':player.money}
+                    send_data = json.dumps(send_data) + '\n'
+                    conn.send(send_data.encode('utf-8'))
+
                 if data == '2': 
                     player.bet_money += table.current_bet
                     player.current_bet = table.current_bet
@@ -396,6 +397,10 @@ class Server(object):
                     table.circles += 1
                     next_player.bet = True
                     player.bet = False
+                    send_data = {'player_no':player.player_no,'status':6, 'bet_money':player.current_bet, 'money':player.money}
+                    send_data = json.dumps(send_data) + '\n'
+                    conn.send(send_data.encode('utf-8'))
+
                 if data == '3':
                     player.bet_money += table.current_bet * 2
                     player.current_bet = table.current_bet * 2
@@ -405,6 +410,11 @@ class Server(object):
                     table.total_bet += player.current_bet
                     next_player.bet = True
                     player.bet = False
+                    send_data = {'player_no':player.player_no,'status':6, 'bet_money':player.current_bet, 'money':player.money}
+                    send_data = json.dumps(send_data) + '\n'
+                    conn.send(send_data.encode('utf-8'))
+               
+
                 if player.player_no == table.end_player:
                     table.first_bet = False
                     table.send_public = True
@@ -419,7 +429,7 @@ class Server(object):
                         conn.send(send_data.encode('utf-8'))
                         while True:
                             if not current_player.bet:
-                                send_data = {'player_no':current_player.player_no,'status':6, 'bet_money':current_player.current_bet}
+                                send_data = {'player_no':current_player.player_no,'status':6, 'bet_money':current_player.current_bet, 'money':current_player.money}
                                 send_data = json.dumps(send_data) + '\n'
                                 conn.send(send_data.encode('utf-8'))
                                 if current_player.player_no == table.end_player:
