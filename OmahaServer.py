@@ -376,8 +376,14 @@ class Server(object):
                         data = '2'
                         break
                 conn.setblocking(1)
-                #data = data.decode('utf-8')
-                if data == '1':
+                if data == 2:
+                    bet_type = '2' 
+                else:
+                    data = json.loads(data)
+                    bet_type = str(data['type'])
+                    
+
+                if bet_type == '1':
                     player.discard = True
                     player.bet = False
                     player.current_bet = 0
@@ -388,7 +394,7 @@ class Server(object):
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
 
-                if data == '2': 
+                elif bet_type == '2': 
                     player.bet_money += table.current_bet
                     player.current_bet = table.current_bet
                     player.money -= player.current_bet
@@ -401,9 +407,10 @@ class Server(object):
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
 
-                if data == '3':
-                    player.bet_money += table.current_bet * 2
-                    player.current_bet = table.current_bet * 2
+                elif bet_type == '3':
+                    bet_money = data['addnum']
+                    player.bet_money += bet_money 
+                    player.current_bet = bet_money 
                     player.money -= player.current_bet
                     table.circles += 1
                     table.current_bet = player.current_bet 
@@ -449,15 +456,37 @@ class Server(object):
                 send_data = {'status':8, 'message':'bet second'}
                 send_data = json.dumps(send_data) + '\n'
                 conn.send(send_data.encode('utf-8'))
-                data = conn.recv(1024) 
-                data = data.decode('utf-8')
-                if data == '1':
+                #计时器
+                start_time = datetime.datetime.now() 
+                conn.setblocking(0)
+                while True:
+                    try:
+                        data = conn.recv(1024) 
+                        if data:
+                            data = data.decode('utf-8')
+                            break
+                    except Exception:
+                        pass
+                    now_time = datetime.datetime.now()
+                    timedel = now_time-start_time
+                    if timedel.total_seconds() >= TIMER:
+                        data = '2'
+                        break
+                conn.setblocking(1)
+                if data == 2:
+                    bet_type = '2' 
+                else:
+                    data = json.loads(data)
+                    bet_type = str(data['type'])
+
+
+                if bet_type == '1':
                     player.discard = True
                     player.bet = False
                     table.send_public = True
                     next_player.bet = True
                     table.players_count -= 1
-                elif data == '2': 
+                elif bet_type == '2': 
                     player.bet_money += table.current_bet
                     player.current_bet = table.current_bet
                     player.money -= player.current_bet
@@ -465,15 +494,16 @@ class Server(object):
                     table.total_bet += player.current_bet
                     player.bet = False
                     next_player.bet = True
-                elif data == '3':
-                    player.bet_money += table.current_bet * 2
-                    player.current_bet = table.current_bet * 2
+                elif bet_type == '3':
+                    bet_money = data['addnum']
+                    player.bet_money += bet_money
+                    player.current_bet = bet_money 
                     player.money -= player.current_bet
                     table.current_bet = player.current_bet 
                     table.total_bet += player.current_bet
                     next_player.bet = True
                     player.bet = False
-                elif data == '4':
+                elif bet_type == '4':
                     player.current_bet = player.money
                     player.bet_money += player.money
                     player.money = 0
@@ -516,15 +546,37 @@ class Server(object):
                 send_data = {'status':8, 'message':'bet end'}
                 send_data = json.dumps(send_data) + '\n'
                 conn.send(send_data.encode('utf-8'))
-                data = conn.recv(1024) 
-                data = data.decode('utf-8')
-                if data == '1':
+                #计时器
+                start_time = datetime.datetime.now() 
+                conn.setblocking(0)
+                while True:
+                    try:
+                        data = conn.recv(1024) 
+                        if data:
+                            data = data.decode('utf-8')
+                            break
+                    except Exception:
+                        pass
+                    now_time = datetime.datetime.now()
+                    timedel = now_time-start_time
+                    if timedel.total_seconds() >= TIMER:
+                        data = '2'
+                        break
+                conn.setblocking(1)
+                if data == 2:
+                    bet_type = '2' 
+                else:
+                    data = json.loads(data)
+                    bet_type = str(data['type'])
+
+
+                if bet_type == '1':
                     player.discard = True
                     player.bet = False
                     table.send_public = True
                     next_player.bet = True
                     table.players_count -= 1
-                elif data == '2': 
+                elif bet_type == '2': 
                     player.bet_money += table.current_bet
                     player.current_bet = table.current_bet
                     player.money -= player.current_bet
@@ -532,15 +584,16 @@ class Server(object):
                     table.total_bet += player.current_bet
                     player.bet = False
                     next_player.bet = True
-                elif data == '3':
-                    player.bet_money += table.current_bet * 2
-                    player.current_bet = table.current_bet * 2
+                elif bet_type == '3':
+                    bet_money = data['addnum']
+                    player.bet_money += bet_money 
+                    player.current_bet = bet_money 
                     player.money -= player.current_bet
                     table.current_bet = player.current_bet 
                     table.total_bet += player.current_bet
                     next_player.bet = True
                     player.bet = False
-                elif data == '4':
+                elif bet_type == '4':
                     player.current_bet = player.money
                     player.bet_money += player.money
                     player.money = 0
