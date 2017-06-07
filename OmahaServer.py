@@ -6,7 +6,7 @@ import threading
 import Omaha_compare 
 import json
 
-CLIENT_NUM = 2
+CLIENT_NUM = 3
 BASE_BET = 50
 TIMER = 15 
 grades ={'high':1, 'one_pair':2, 'two_pairs':3, 'three':4, 'straight':5, 'flush':6, 'full_house':7, 'four':8, 'straight_flush':9, 'royal_flush':10}
@@ -424,7 +424,10 @@ class Server(object):
             if player.bet and not table.end:
                 if table.players_count == 1:
                     table.end = True
-                    break
+                if player.discard or player.all_in:
+                    next_player.bet = True
+                    player.bet = False
+                    continue
                 send_data = {'status':8, 'message':'bet second', 'base_bet':table.current_bet, 'time_del':TIMER}
                 send_data = json.dumps(send_data) + '\n'
                 conn.send(send_data.encode('utf-8'))
@@ -535,6 +538,12 @@ class Server(object):
                 if table.players_count == 1:
                     table.end = True
                     break
+
+                if player.discard or player.all_in:
+                    next_player.bet = True
+                    player.bet = False
+                    continue
+               
                 send_data = {'status':8, 'message':'bet end','base_bet':table.current_bet, 'time_del':TIMER}
                 send_data = json.dumps(send_data) + '\n'
                 conn.send(send_data.encode('utf-8'))
