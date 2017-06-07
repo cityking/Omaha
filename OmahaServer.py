@@ -6,10 +6,9 @@ import threading
 import Omaha_compare 
 import json
 
-CLIENT_NUM = 3
+CLIENT_NUM = 2
 BASE_BET = 50
-TIMER = 15
-
+TIMER = 15 
 grades ={'high':1, 'one_pair':2, 'two_pairs':3, 'three':4, 'straight':5, 'flush':6, 'full_house':7, 'four':8, 'straight_flush':9, 'royal_flush':10}
 
 
@@ -25,7 +24,7 @@ def trans_cards(cards):
 
 class Player(object):
     def __init__(self, money):
-        self.adress = None
+        self.address = None
         self.player_no = None
         self.bluff = []    #底牌
         self.public_cards = []    #公牌
@@ -37,6 +36,7 @@ class Player(object):
         self.discard = False    #弃牌
         self.all_in = False
         self.win = False
+
     def reset(self):
         self.bluff = []    #底牌
         self.public_cards = []    #公牌
@@ -59,6 +59,7 @@ class TableInfo(object):
         self.end = False
         self.cards_init = False
         self.players_count = 0
+        self.end_count = 0
         self.players = []
         self.win = None
         self.circles = 0
@@ -76,8 +77,8 @@ class TableInfo(object):
         self.bet_before = 0
         self.first_player = 0
         self.end_player = CLIENT_NUM - 1
+        self.player_reset = 0
     def reset(self):
-        self.init = False
         self.current_bet = 0
         self.total_bet = 0
         self.start = False
@@ -97,6 +98,8 @@ class TableInfo(object):
         self.endplayer = None
         self.end_done = False
         self.bet_before = 0
+        self.end_count = 0
+        self.player_reset = 0
      
 
 
@@ -130,6 +133,7 @@ class Server(object):
         self.clients = []
         self.tables = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self.socket.bind((self.host, self.port))
         self.socket.listen(7)
         
@@ -151,129 +155,145 @@ class Server(object):
 
     def handle(self, conn, addr):
 
-    
-        send_data = {'status':0}
-        send_data = json.dumps(send_data) 
-        send_data += '\n'
-        conn.send(send_data.encode('utf-8'))
-        while True:
-            data = conn.recv(1024) 
-            if data:
-                data = data.decode('utf-8')
-                data = json.loads(data)
-                print(data)
-
-            #开始游戏
-            if 'client_status' in data.keys() and data['client_status'] == 1:
-                player_no = self.start_game(conn, addr)
-
-           
-                table = self.tables[0]
-                player = table.players[player_no]
-                next_player = table.players[(player_no+1) % CLIENT_NUM]
-                self.bet_first(conn, player, next_player, table)
-
-            #发前三张公牌
+        try: 
             while True:
-                if table.send_public:
-                    cards_info = player.public_cards[0:3]
-                    send_data = {'status':7, 'public_cards':cards_info}
-                    send_data = json.dumps(send_data) + '\n'
-                    conn.send(send_data.encode('utf-8'))
-                    if player.player_no == table.end_player:
-                        table.second_bet = True
-                    break
+                import pdb
+                pdb.set_trace()
+                send_data = {'status':0}
+                send_data = json.dumps(send_data) 
+                send_data += '\n'
+                conn.send(send_data.encode('utf-8'))
 
-            #第二圈下注
+                data = conn.recv(1024) 
+                if data:
+                    data = data.decode('utf-8')
+                    data = json.loads(data)
+                    print(data)
 
-            self.bet_second(conn, player, next_player, table)
+                #开始游戏
+                if 'client_status' in data.keys() and data['client_status'] == 1:
+                    
+                    player_no = self.start_game(conn, addr)
 
-            
-            #发第四张公牌
-            while True:
-                if table.send_public:
-                    cards_info = player.public_cards[3:4]
-                    send_data = {'status':11, 'public_four':cards_info}
-                    send_data = json.dumps(send_data) + '\n'
-                    conn.send(send_data.encode('utf-8'))
-                    if player.player_no == table.first_player:
-                        table.second_bet = True
-                    break
+               
+                    table = self.tables[0]
+                    player = table.players[player_no]
+                    next_player = table.players[(player_no+1) % CLIENT_NUM]
+                    self.bet_first(conn, player, next_player, table)
 
-            #第三圈下注
-            self.bet_second(conn, player, next_player, table)
-           
-            #发第五张公牌
-            while True:
-                if table.send_public:
-                    cards_info = player.public_cards[4:]
-                    send_data = {'status':12, 'public_five':cards_info}
-                    send_data = json.dumps(send_data) + '\n'
-                    conn.send(send_data.encode('utf-8'))
-                    if player.player_no == table.first_player:
-                        table.end_bet = True
-                    break
-
-
-            #最后一圈下注
-            self.bet_end(conn, player, next_player, table)
-           
-            while True:
-                if table.end:
-                    if table.end_player==player.player_no:
-
-                        current_players = []
-                        for current in table.players:
-                            if not current.discard:
-                                current_players.append(current)
-                        win_players = compare_result(current_players)
-                        win_money_per_player = table.total_bet/len(win_players)    
-                        table.win = win_players
-
-                        results = []
-                        for player in table.players:
-                            if player in table.win:
-                                money = win_money_per_player - player.bet_money
-                                is_win = True 
-
-                                max_type = 'high'
-                                for card_type in player.card_type.keys():
-                                    if grades[card_type] > grades[max_type]:
-                                        max_type = card_type
-                                cards = trans_cards(player.card_type[max_type])        
-
-                                result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
-                                results.append(result)
-                        send_data = {'status':13, 'data':results}
-                        send_data = json.dumps(send_data)+'\n'
+                #发前三张公牌
+                while True:
+                    if table.send_public:
+                        cards_info = player.public_cards[0:3]
+                        send_data = {'status':7, 'public_cards':cards_info}
+                        send_data = json.dumps(send_data) + '\n'
                         conn.send(send_data.encode('utf-8'))
- 
-
-                        table.end_done = True
+                        if player.player_no == table.end_player:
+                            table.second_bet = True
                         break
-                    else:
-                        if table.end_done:
-                            win_money_per_player = table.total_bet//len(table.win)    
+
+                #第二圈下注
+
+                self.bet_second(conn, player, next_player, table)
+
+                
+                #发第四张公牌
+                while True:
+                    if table.send_public:
+                        cards_info = player.public_cards[3:4]
+                        send_data = {'status':11, 'public_four':cards_info}
+                        send_data = json.dumps(send_data) + '\n'
+                        conn.send(send_data.encode('utf-8'))
+                        if player.player_no == table.first_player:
+                            table.second_bet = True
+                        break
+
+                #第三圈下注
+                self.bet_second(conn, player, next_player, table)
+               
+                #发第五张公牌
+                while True:
+                    if table.send_public:
+                        cards_info = player.public_cards[4:]
+                        send_data = {'status':12, 'public_five':cards_info}
+                        send_data = json.dumps(send_data) + '\n'
+                        conn.send(send_data.encode('utf-8'))
+                        if player.player_no == table.first_player:
+                            table.end_bet = True
+                        break
+
+
+                #最后一圈下注
+                self.bet_end(conn, player, next_player, table)
+               
+                while True:
+                    if table.end:
+                        if table.end_player==player.player_no:
+
+                            current_players = []
+                            for current in table.players:
+                                if not current.discard:
+                                    current_players.append(current)
+                            win_players = compare_result(current_players)
+                            win_money_per_player = table.total_bet//len(win_players)    
+                            table.win = win_players
+
                             results = []
                             for player in table.players:
                                 if player in table.win:
                                     money = win_money_per_player - player.bet_money
                                     is_win = True 
-    
+
                                     max_type = 'high'
                                     for card_type in player.card_type.keys():
                                         if grades[card_type] > grades[max_type]:
                                             max_type = card_type
                                     cards = trans_cards(player.card_type[max_type])        
-    
-                                    result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
-     
 
+                                    result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
                                     results.append(result)
-                            send_data = {'status':12, 'data':results}
+                            send_data = {'status':13, 'data':results}
                             send_data = json.dumps(send_data)+'\n'
                             conn.send(send_data.encode('utf-8'))
+                            table.end_count += 1 
+
+                            table.end_done = True
                             break
+                        else:
+                            if table.end_done:
+                                win_money_per_player = table.total_bet//len(table.win)    
+                                results = []
+                                for player in table.players:
+                                    if player in table.win:
+                                        money = win_money_per_player - player.bet_money
+                                        is_win = True 
+    
+                                        max_type = 'high'
+                                        for card_type in player.card_type.keys():
+                                            if grades[card_type] > grades[max_type]:
+                                                max_type = card_type
+                                        cards = trans_cards(player.card_type[max_type])        
+    
+                                        result = {'player_no':player.player_no, 'card_type':max_type,'cards':cards, 'money':money, 'is_win':is_win}
+     
+
+                                        results.append(result)
+                                send_data = {'status':12, 'data':results}
+                                send_data = json.dumps(send_data)+'\n'
+                                conn.send(send_data.encode('utf-8'))
+                                table.end_count += 1
+                                break
+
+                #牌桌和玩家重置
+                while True:
+                    if table.end_count == CLIENT_NUM:
+                        player.reset()
+                        table.player_reset += 1
+                        if table.player_reset == CLIENT_NUM:
+                            table.reset()
+                        break
+        finally:
+            conn.close()
                     
     def start_game(self, conn, addr):
         if self.tables==[]:
@@ -287,8 +307,8 @@ class Server(object):
         #table.reset()
         
         #玩家初始化
-        if table.times == 0:
-            player = self.init_player(addr, conn)
+        player = self.init_player(addr, conn)
+       
         
 
         #下底注
@@ -636,10 +656,15 @@ class Server(object):
     def init_player(self, addr, conn):
         table = self.tables[0]
         if table.players_count < CLIENT_NUM:
-            player = Player(5000)
-            player.address = addr
-            player.player_no = table.players_count
-            table.players.append(player)
+            for current in table.players:
+                if current.address == addr:
+                    player = current
+                    break
+            else:
+                player = Player(5000)
+                player.player_no = table.players_count
+                player.address = addr
+                table.players.append(player)
             table.players_count += 1
             while True:
                 if table.players_count == CLIENT_NUM:
@@ -676,12 +701,12 @@ class Server(object):
 
                mylock.release()
 
-               for card in table.public_cards:
-                   print(card.suit.name)
-                   print(card.rank)
-               #print('公牌:%s' % table.public_cards)
-               #print('玩家%s的底牌:%s' % (hand.player, hand.bluff))
-               #print(hand.player,hand.card_type)
+               #for card in table.public_cards:
+               #    print(card.suit.name)
+               #    print(card.rank)
+               print('公牌:%s' % table.public_cards)
+               print('玩家%s的底牌:%s' % (hand.player, hand.bluff))
+               print(hand.player,hand.card_type)
               
 
 
