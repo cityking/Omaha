@@ -78,6 +78,11 @@ class TableInfo(object):
         self.first_player = 0
         self.end_player = CLIENT_NUM - 1
         self.player_reset = 0
+        self.current_players_count =0
+        self.in_first = True
+        self.send_first = 0
+        self.send_second = 0
+        self.send_third = 0
     def reset(self):
         self.current_bet = 0
         self.total_bet = 0
@@ -100,7 +105,12 @@ class TableInfo(object):
         self.bet_before = 0
         self.end_count = 0
         self.player_reset = 0
-     
+        self.current_players_count =0
+        self.in_first = True
+        self.send_first = 0
+        self.send_second = 0
+        self.send_third = 0
+    
 
 
 
@@ -156,18 +166,44 @@ class Server(object):
     def handle(self, conn, addr):
 
         try: 
-            send_data = {'status':0}
-            send_data = json.dumps(send_data) 
-            send_data += '\n'
-            conn.send(send_data.encode('utf-8'))
-
 
             while True:
+                send_data = {'status':0}
+                send_data = json.dumps(send_data) 
+                send_data += '\n'
+                conn.send(send_data.encode('utf-8'))
+
+
                 data = conn.recv(1024) 
                 if data:
                     data = data.decode('utf-8')
                     data = json.loads(data)
                     print(data)
+
+ 
+                if self.tables==[]:
+                    #创建牌桌
+                    table = TableInfo()
+                    self.tables.append(table)
+                else:
+                    table = self.tables[0]
+                
+                while table.start:
+                    pass
+                table.current_players_count += 1
+                if table.current_players_count > CLIENT_NUM:
+                    break
+                if table.in_first:
+                    table.in_first = False
+                    time.sleep(10)
+                    while True:
+                        if table.current_players_count > 1:
+                            table.start = True
+                            break
+                while True:
+                    if table.start:
+                        break
+                   
 
                 #开始游戏
                 if 'client_status' in data.keys() and data['client_status'] == 1:
@@ -177,18 +213,20 @@ class Server(object):
                
                     table = self.tables[0]
                     player = table.players[player_no]
-                    next_player = table.players[(player_no+1) % CLIENT_NUM]
-                    time.sleep(6)
+                    next_player = table.players[(player_no+1) % table.current_players_count]
                     self.bet_first(conn, player, next_player, table)
 
                 #发前三张公牌
+
                 while True:
                     if table.send_public or table.end:
                         cards_info = player.public_cards[0:3]
                         send_data = {'status':7, 'public_cards':cards_info}
                         send_data = json.dumps(send_data) + '\n'
                         conn.send(send_data.encode('utf-8'))
-                        if player.player_no == table.end_player:
+                        
+                        table.send_first += 1 
+                        if table.send_first == table.current_players_count:
                             table.second_bet = True
                         break
 
@@ -204,8 +242,10 @@ class Server(object):
                         send_data = {'status':11, 'public_four':cards_info}
                         send_data = json.dumps(send_data) + '\n'
                         conn.send(send_data.encode('utf-8'))
-                        if player.player_no == table.first_player:
+                        table.send_second += 1
+                        if table.send_second == table.current_players_count:
                             table.second_bet = True
+
                         break
 
                 #第三圈下注
@@ -218,8 +258,8 @@ class Server(object):
                         send_data = {'status':12, 'public_five':cards_info}
                         send_data = json.dumps(send_data) + '\n'
                         conn.send(send_data.encode('utf-8'))
-                        if player.player_no == table.first_player:
-                            table.end_bet = True
+                        if table.send_third == table.current_players_count:
+                            table.second_bet = True
                         break
 
 
@@ -229,47 +269,38 @@ class Server(object):
                 #结束本次游戏，并返回赢家信息
                 self.end_game(conn, table, player)
                 
-                time.sleep(30)
+                time.sleep(10)
                 #牌桌和玩家重置
                 while True:
-                    if table.end_count == CLIENT_NUM:
+                    if table.end_count == table.current_players_count:
                         player.reset()
                         table.player_reset += 1
-                        if table.player_reset == CLIENT_NUM:
+                        if table.player_reset == table.current_players_count:
                             table.reset()
                         break
         finally:
             conn.close()
                     
     def start_game(self, conn, addr):
-        if self.tables==[]:
-            #创建牌桌
-            table = TableInfo()
-            self.tables.append(table)
-        else:
-            table = self.tables[0]
-        
-        table.start = True
-        #table.reset()
         
         #玩家初始化
         player = self.init_player(addr, conn)
-       
+        table = self.tables[0] 
         
 
         #下底注
         self.bet_before(player, conn)
 
         #发底牌 
-        if player.player_no == CLIENT_NUM - 1:
-            if table.bet_before == CLIENT_NUM:
+        if player.player_no == table.current_players_count - 1:
+            if table.bet_before == table.current_players_count:
                 self.init_cards()
                 
                 send_data = {'status':3, 'bluff':player.bluff}
                 send_data = json.dumps(send_data) + '\n'
                 conn.send(send_data.encode('utf-8'))
                 table.last_cards += 1
-                if table.last_cards == CLIENT_NUM:
+                if table.last_cards == table.current_players_count:
                     table.last_card_sented = True
         else:
             while True:
@@ -278,7 +309,7 @@ class Server(object):
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
                     table.last_cards += 1
-                    if table.last_cards == CLIENT_NUM:
+                    if table.last_cards == table.current_players_count:
                         table.last_card_sented = True
                     break
         return player.player_no
@@ -291,10 +322,10 @@ class Server(object):
         table.total_bet += BASE_BET
         player.money -= BASE_BET
         times = table.times
-        first = times % CLIENT_NUM
+        first = times %table.current_players_count 
         end = first-1
         if end == -1:
-            end = CLIENT_NUM - 1
+            end = table.current_players_count - 1
         table.first_player = first
         table.end_player = end
         table.players[first].bet = True
@@ -302,7 +333,7 @@ class Server(object):
         table.last_card_sented = False
         table.bet_before += 1
         while True:
-            if table.bet_before == CLIENT_NUM:
+            if table.bet_before == table.current_players_count:
                 current_players = []
                 for current_player in table.players:
                     current_bet = current_player.current_bet
@@ -358,10 +389,13 @@ class Server(object):
                     table.circles += 1
                     next_player.bet = True
                     table.players_count -= 1
+                    if table.players_count == 1:
+                        table.end = True
+                        table.first_bet = False
+
                     send_data = {'player_no':player.player_no,'status':6, 'bet_money':player.current_bet, 'money':player.money, 'total_bet':table.total_bet}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
-                    break
 
                 elif bet_type == '2': 
                     player.bet_money += table.current_bet
@@ -424,6 +458,8 @@ class Server(object):
             if player.bet and not table.end:
                 if table.players_count == 1:
                     table.end = True
+                    table.send_public = True
+                    break
                 if player.discard or player.all_in:
                     next_player.bet = True
                     player.bet = False
@@ -462,6 +498,9 @@ class Server(object):
                     table.send_public = True
                     next_player.bet = True
                     table.players_count -= 1
+                    if table.players_count == 1:
+                        table.end = True
+                        table.second_bet = False
                     send_data = {'player_no':player.player_no,'status':10, 'bet_money':player.current_bet, 'money':player.money, 'total_bet':table.total_bet}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
@@ -504,6 +543,9 @@ class Server(object):
                     send_data = {'player_no':player.player_no,'status':10, 'bet_money':player.current_bet, 'money':player.money, 'total_bet':table.total_bet}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
+                    if table.players_count == 1:
+                        table.end = True
+                   
                     break
 
                 if player.player_no == table.end_player:
@@ -581,6 +623,9 @@ class Server(object):
                     send_data = {'player_no':player.player_no,'status':10, 'bet_money':player.current_bet, 'money':player.money, 'total_bet':table.total_bet}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
+                    if table.players_count == 1:
+                        table.end = True
+                        table.end_bet = False
                     break
 
                 elif bet_type == '2': 
@@ -620,6 +665,11 @@ class Server(object):
                     send_data = {'player_no':player.player_no,'status':10, 'bet_money':player.current_bet, 'money':player.money, 'total_bet':table.total_bet}
                     send_data = json.dumps(send_data) + '\n'
                     conn.send(send_data.encode('utf-8'))
+                    if table.players_count == 1:
+                        table.end = True
+                        table.end_bet = False
+
+                    break
 
 
                 if player.player_no == table.end_player:
@@ -653,19 +703,23 @@ class Server(object):
     #玩家初始化
     def init_player(self, addr, conn):
         table = self.tables[0]
-        if table.players_count < CLIENT_NUM:
+        if table.players_count < table.current_players_count:
             for current in table.players:
                 if current.address == addr:
                     player = current
                     break
             else:
                 player = Player(5000)
-                player.player_no = table.players_count
+                no_list = [player.player_no for player in table.players]
+                for i in range(0, CLIENT_NUM):
+                    if i not in no_list:
+                        player.player_no = i                       
+                        break
                 player.address = addr
                 table.players.append(player)
             table.players_count += 1
             while True:
-                if table.players_count == CLIENT_NUM:
+                if table.players_count == table.current_players_count:
                     other_players = []
                     for other_player in table.players:
                         if other_player != player:
@@ -683,7 +737,7 @@ class Server(object):
     def init_cards(self):
        desk = self.tables[0]
        if not desk.cards_init:
-           players=[ i for i in range(1, CLIENT_NUM+1)]
+           players=[ i for i in range(1, desk.current_players_count+1)]
            table = Omaha.Table(players)
            for i in range(5):
                table.pop()
