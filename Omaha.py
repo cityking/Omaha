@@ -3,6 +3,20 @@ import random
 from collections import Counter
 from Omaha_utility import *
 
+def my_sort(cards):
+    cards_rank = sorted([int(card.rank) for card in cards])
+    
+    sorted_cards = []
+    for rank in cards_rank:
+        for card in cards:
+            if int(card.rank) == rank:
+                if card not in sorted_cards:
+                    sorted_cards.append(card)
+    return sorted_cards
+
+
+        
+
 class PokerCard:
     '''
     1.一张牌包括点数和花色
@@ -118,6 +132,8 @@ class Hand():
         self.player = player
         self.bluff = [deck.pop(), deck.pop(), deck.pop(), deck.pop()]
         self.card_type = {}
+        self.card_type_1 = {}
+        self.card_type_2 = {}
 
     # 检查组成牌型的牌是否符合要求
     def check_common(self, public_cards, card_type):
@@ -168,6 +184,9 @@ class Hand():
         card):不符合上面任何一种牌型的牌型，由单牌且不连续不同花的组成
 
         '''
+        card_type = {}
+        self.bluff = my_sort(self.bluff)
+        public_cards = my_sort(public_cards)
         total_cards = self.bluff + public_cards
         suit_dict = {
             'Club':[],
@@ -185,29 +204,39 @@ class Hand():
             if len(suit_dict[k]) >= 5:
                 # 先排序
                 card_rank, flush = self.sort_cards(suit_dict[k])
+                print(flush)
                 # 只要找到连续5个并且通过就好, 多组的话就覆盖
                 i = 0
-                while i+5 < len(flush):
+                while i+5 <= len(flush):
                     if self.check_common(public_cards, flush[i:i+5]):
+                        print(flush[i:i+5])
                         # 用all判断连续
                         if all(int(flush[i].rank)+1 == int(flush[i+1].rank)
-                            for i in range(i, i+5)):
+                            for i in range(i, i+4)):
                             # 如果连续再判断是否满足两张底牌+三张公牌
                             if card_rank == [10,11,12,13,14]:
                                 #print('皇家同花顺', k, flush[i:i+5])
-                                self.card_type['royal_flush'] = flush[i:i+5]
+                                card_type['royal_flush'] = flush[i:i+5]
                             else:
                                 #print('同花顺：',k, flush[i:i+5])
-                                self.card_type['straight_flush'] = flush[i:i+5]
+                                card_type['straight_flush'] = flush[i:i+5]
                         else:
                             #print('同花:', k, flush[i:i+5])
-                            self.card_type['flush'] = flush[i:i+5]
+                            card_type['flush'] = flush[i:i+5]
                     i += 1
+                if 'flush' not in card_type.keys():
+                    flush_list = search(flush, 5)
+                    for cards in flush_list:
+                        if self.check_common(public_cards, cards):
+                            #print ('高牌：', high)
+                            card_type['flush'] = cards 
+        
                 break
+
         # 先判断对子，再判断顺子
         rank_list, sorted_cards = self.sort_cards(total_cards)
         rank_counter = Counter(rank_list)
-        #print('重复检查：', rank_counter.most_common())
+
         multi_list = rank_counter.most_common()
         multi_dict = {
             '4':[],
@@ -230,14 +259,22 @@ class Hand():
                     temp.append(card)
                     if self.check_common(public_cards, temp):
                         #print ('四条：', temp)
-                        self.card_type['four'] = temp 
+                        card_type['four'] = temp 
+
+        if 'four' not in card_type.keys():
+            for item in multi_dict['4']:
+                for card in item:
+                    temp = item.copy()
+                    temp.remove(card)
+                    multi_dict['3'].append(temp)
+
         # 判断葫芦或三条
         for item in multi_dict['3']:
             for t in multi_dict['2']:
                 temp = item.copy()
                 temp.extend(t)
                 if self.check_common(public_cards, temp):
-                    self.card_type['full_house'] = temp
+                    card_type['full_house'] = temp
             # 再判断三条
             not_three = []
             for card in total_cards:
@@ -248,9 +285,28 @@ class Hand():
                 temp = item.copy()
                 temp.extend(i)
                 if self.check_common(public_cards, temp):
-                    #print(temp)
-                    self.card_type['three'] = temp
+                    card_type['three'] = temp
+
+
+        for item in multi_dict['3']:
+            for t in multi_dict['3']:
+                if item != t:
+                    t_list = [[t[0], t[1]], [t[1], t[2]], [t[0], t[2]]]
+                    for tt in t_list:
+                        temp = item.copy()
+                        temp.extend(tt)
+                        if self.check_common(public_cards, temp):
+                            card_type['full_house'] = temp
+
+        if 'three' not in card_type.keys() or 'full_house' not in card_type.keys():
+            for item in multi_dict['3']:
+                for card in item:
+                    temp = item.copy()
+                    temp.remove(card)
+                    multi_dict['2'].append(temp)
+ 
         # 判断两对或一对
+
         if len(multi_dict['2']) > 1:
             #print('multi_dict["2"]:',multi_dict['2'])
             for item in multi_dict['2']:
@@ -266,7 +322,21 @@ class Hand():
                             temp_two_pairs.append(card)
                             if self.check_common(public_cards, temp_two_pairs):
                                 #print('two pairs:', temp_two_pairs)
-                                self.card_type['two_pairs'] = temp_two_pairs
+                                card_type['two_pairs'] = temp_two_pairs
+            if 'two_pairs' not in card_type.keys():
+                for iterm in multi_dict['2']:
+                    not_pair = []
+                    for card in total_cards:
+                        if card not in iterm:
+                            not_pair.append(card)
+                    pair_list = search(not_pair, 3)
+                    for i in pair_list:
+                        temp = iterm.copy()
+                        temp.extend(i)
+                        if self.check_common(public_cards, temp):
+                            #print('one_pair:',temp)
+                            card_type['one_pair'] = temp
+                   
         if len(multi_dict['2']) == 1:
             not_pair = []
             for card in total_cards:
@@ -278,24 +348,32 @@ class Hand():
                 temp.extend(i)
                 if self.check_common(public_cards, temp):
                     #print('one_pair:',temp)
-                    self.card_type['one_pair'] = temp
+                    card_type['one_pair'] = temp
         # 判断杂牌还是顺子
-        card_rank, flush = self.sort_cards(total_cards)
-        i = 0
-        while i+5 < len(flush):
-            if self.check_common(public_cards, flush[i:i+5]):
-                # 用all判断连续
-                if all(int(flush[i].rank)+1 == int(flush[i+1].rank)
-                    for i in range(i, i+5)):
-                    #print('顺子：', flush[i:i+5])
-                    self.card_type['straight'] = flush[i:i+5]
-            i+=1
+        flush = my_sort(total_cards)
+#        i = 0
+#        while i+5 < len(flush):
+#            if self.check_common(public_cards, flush[i:i+5]):
+#                # 用all判断连续
+#                if all(int(flush[i].rank)+1 == int(flush[i+1].rank)
+#                    for i in range(i, i+5)):
+#                    #print('顺子：', flush[i:i+5])
+#                    self.card_type['straight'] = flush[i:i+5]
+#            i+=1
+        flush_list = search(flush, 5)
+
+        for cards in flush_list:
+            if self.check_common(public_cards, cards):
+                if all(int(cards[i].rank)+1 == int(cards[i+1].rank) for i in range(0, 4)):
+                    card_type['straight'] = cards 
+
+        cards_rank, flush = self.sort_cards(total_cards)
         high_list = search(flush, 5)
         for high in high_list:
             if self.check_common(public_cards, high):
                 #print ('高牌：', high)
-                self.card_type['high'] = high
-        pass
+                card_type['high'] = high
+        return card_type
 
     def __repr__(self):
         #return "{__class__.__name__}(suit={suit!r}, rank={rank!r})".format(__class__=self.__class__, **self.__dict__)
@@ -326,49 +404,40 @@ class Table:
         self.public_cards.append(card)
         if len(self.public_cards) == 5:
             for hand in self.hands:
-                hand.set_card_type(self.public_cards)
-                #print(hand.card_type)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                hand.card_type = hand.set_card_type(self.public_cards)
+                hand.card_type_1 = hand.set_card_type(self.public_cards[:3])
+                hand.card_type_2 = hand.set_card_type(self.public_cards[:4])
 
 
         
 if __name__ == '__main__':
-    #Club, Diamond, Heart, Spade = Suit('Club','♣'), Suit('Diamond','♦'), Suit('Heart','♥'), Suit('Spade','♠')
+    Club, Diamond, Heart, Spade = Suit('Club','♣'), Suit('Diamond','♦'), Suit('Heart','♥'), Suit('Spade','♠')
     #print(Club, Diamond, Heart, Spade )
     #d2 = [ PokerCard('A', Spade), PokerCard('2', Spade), PokerCard('3', Spade), ]
     #print(d2)
     #deck = Deck()
     #hand = [d.pop(), d.pop()]
-    players = [1,2,3,4,5,6,7]
+    bluff = [PokerCard('2', Club), PokerCard('13', Spade), PokerCard('10', Heart), PokerCard('14', Club)]
+    public = [PokerCard('3', Club), PokerCard('11', Club), PokerCard('4', Club),PokerCard('8', Club), PokerCard('3', Diamond) ]
+    print(public)
+    players = [i for i in range(0,1)]
     for t in range(5):
         #print('----------')
         table = Table(players)
+        
         for i in range(5):
             table.pop()
         #print('公牌:%s' % table.public_cards)
         for hand in table.hands:
+            hand.bluff = bluff 
+            table.public_cards = public
+            
             #if hand.card_type == {}:
-            #if 'straight_flush' in hand.card_type.keys():
+            #if 'flush' in hand.card_type.keys():
             print('公牌:%s' % table.public_cards)
             print('玩家%s的底牌:%s' % (hand.player, hand.bluff))
+            hand.card_type = hand.set_card_type(public)
             print(hand.player,hand.card_type)
-            for card_type in hand.card_type:
-                print(card_type, hand.card_type[card_type][0].suit)
-                print(card_type, hand.card_type[card_type][0].rank)
 
 
-            pass
+   #         pass

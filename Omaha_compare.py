@@ -3,9 +3,9 @@ import Omaha
 grades ={'high':1, 'one_pair':2, 'two_pairs':3, 'three':4, 'straight':5, 'flush':6, 'full_house':7, 'four':8, 'straight_flush':9, 'royal_flush':10}
 
 def max_type(card_type):
-    max_type = 'high'
+    max_type = None 
     for ctype in card_type:
-        if grades[ctype] > grades[max_type]:
+        if max_type == None or grades[ctype] > grades[max_type]:
             max_type = ctype
     return max_type
 
@@ -125,27 +125,8 @@ def compare(card_type1, card_type2):
 
 if __name__ == '__main__':
 
-    #from Omaha import PokerCard, Suit
-    #Club, Diamond, Heart, Spade = Suit('Club','♣'), Suit('Diamond','♦'), Suit('Heart','♥'), Suit('Spade','♠')
-    #cards1 = []
-    #cards1.append(PokerCard('8', Club))
-    #cards1.append(PokerCard('4', Diamond))
-    #cards1.append(PokerCard('5', Club))
-    #cards1.append(PokerCard('6', Club))
-    #cards1.append(PokerCard('7', Club))
-
-    #cards2 = []
-    #cards2.append(PokerCard('6', Club))
-    #cards2.append(PokerCard('5', Diamond))
-    #cards2.append(PokerCard('3', Club))
-    #cards2.append(PokerCard('4', Club))
-    #cards2.append(PokerCard('7', Club))
-    #     
-    #print(compare_straight(cards1, cards2))
-
     players = [1,2]
-    for t in range(5):
-        #print('----------')
+    for t in range(1000):
         table = Omaha.Table(players)
         for i in range(5):
             table.pop()
@@ -153,12 +134,18 @@ if __name__ == '__main__':
         cardstype = []
         for hand in table.hands:
             #if hand.card_type == {}:
-            #if 'straight_flush' in hand.card_type.keys():
-            print('公牌:%s' % table.public_cards)
-            print('玩家%s的底牌:%s' % (hand.player, hand.bluff))
-            print(hand.player,hand.card_type)
-            cardstype.append(hand.card_type)
+            if 'straight' in hand.card_type.keys():
+#            if True:
+                print('----------')
+                print('公牌:%s' % table.public_cards)
+                print('玩家%s的底牌:%s' % (hand.player, hand.bluff))
+                print(hand.player,hand.card_type)
+                cardstype.append(hand.card_type)
 
-        print(compare(cardstype[0], cardstype[1]))
+        #result = compare(cardstype[0], cardstype[1])
+        #if result > 0:
+        #    print(cardstype[0])
+        #else:
+        #    print(cardstype[1])
 
 
