@@ -39,6 +39,7 @@ def do_next_player(table, player):
 def send_off_line_players(table, conn):
     send_players = []
     while True:
+        time.sleep(0.01)
         if len(table.offline_players) > 0:
             players = []
             for player in table.offline_players:
@@ -91,6 +92,7 @@ def do_off_line(data, table, player, thread_status):
                 #如果next_player不存在，继续向前找
                 i = 1
                 while not next_player:
+                    time.sleep(0.01)
                     i += 1
                     next_player = table.players[(index-i) % table.current_players_count]
                     if i >= len(table.players):
@@ -115,6 +117,7 @@ def recv_data(thread_parent,conn, qu, table, player, thread_status):
     thread_name = threading.current_thread().getName()
     conn.setblocking(0) 
     while True:
+        time.sleep(0.01)
         try:
             data = conn.recv(1024) 
             if data:
@@ -265,6 +268,7 @@ class Server(object):
     def start(self):
         self.create_tables()
         while True:
+            time.sleep(0.01)
             conn, addr = self.socket.accept()
             logger.info('CLient %s connected!' % str(addr))
             t = threading.Thread(target = self.handle, args = [conn, addr]) 
@@ -329,6 +333,7 @@ class Server(object):
            
 
             while True:
+                time.sleep(0.01)
                 logger.info('-'*100)
                 if player.money < BASE_BET*2: 
                     start = 1 #钱不够, 不能开局
@@ -340,6 +345,7 @@ class Server(object):
                 start_time = datetime.datetime.now() 
                 time.sleep(3)
                 while True:
+                    time.sleep(0.01)
                     if is_first:
                         is_first = False
                         time.sleep(3)
@@ -358,7 +364,7 @@ class Server(object):
                         if 'client_status' in data.keys() and data['client_status'] == 1:
                             break
                 while table.start:
-                    pass
+                    time.sleep(0.01)
 
                 
                 thread_status['status'] = 'init'
@@ -382,6 +388,7 @@ class Server(object):
                     start_time = datetime.datetime.now()
                     print({'players_num':table.players_num, 'current_players_num':table.current_players_count})
                     while True:
+                        time.sleep(0.01)
                         if table.current_players_count == table.players_num and table.current_players_count > 1:
                             print({'players_num':table.players_num, 'current_players_num':table.current_players_count})
                             table.start = True
@@ -394,6 +401,7 @@ class Server(object):
                                 break
 
                 while True:
+                    time.sleep(0.01)
                     if table.start:
                         break
                 print(thread_name,'start game')
@@ -403,6 +411,7 @@ class Server(object):
                     identity = data['identity']
 
                     while True:
+                        time.sleep(0.01)
                         if table.start:
                             break
                     
@@ -426,6 +435,7 @@ class Server(object):
                 
 
                 while True:
+                    time.sleep(0.01)
                     if not table.end:
                         time.sleep(1)
                     if table.end and table.end_num == 1:
@@ -461,6 +471,7 @@ class Server(object):
                 
                 #发第四张公牌
                 while True:
+                    time.sleep(0.01)
                     if not table.end:
                         time.sleep(1)
                     if table.end and table.end_num == 1:
@@ -497,6 +508,7 @@ class Server(object):
                 logger.info({thread_name:'end bet_second'}) 
                 #发第五张公牌
                 while True:
+                    time.sleep(0.01)
                     if not table.end:
                         time.sleep(1)
                     if table.end and table.end_num == 1:
@@ -571,6 +583,7 @@ class Server(object):
             table.start = False
 
         while True:
+            time.sleep(0.01)
             if table.start:
                 break
         
@@ -582,6 +595,7 @@ class Server(object):
         #发底牌 
         
         while True:
+            time.sleep(0.01)
             if len(table.players) > 1:
                 break
 
@@ -591,6 +605,7 @@ class Server(object):
             if table.bet_before == table.current_players_count:
                 self.init_cards(table)
                 while True:
+                    time.sleep(0.01)
                     if len(player.bluff) == 4:
                         send_data = {'status':3, 'bluff':player.bluff}
                         logger.info({'bluff':player.bluff})
@@ -603,8 +618,10 @@ class Server(object):
                     table.last_card_sented = True
         else:
             while True:
+                time.sleep(0.01)
                 if table.cards_init:
                     while True:
+                        time.sleep(0.01)
                         if len(player.bluff) == 4:
                             send_data = {'status':3, 'bluff':player.bluff}
                             logger.info(send_data)
@@ -639,6 +656,7 @@ class Server(object):
         table.last_card_sented = False
         table.bet_before += 1
         while True:
+            time.sleep(0.01)
             if table.bet_before == table.current_players_count:
                 current_players = []
                 for current_player in table.players:
@@ -662,6 +680,7 @@ class Server(object):
         player.current_bet = 0
 
         while True:
+            time.sleep(0.01)
             if table.end_first or table.end:
                 break
             #当前下注情况
@@ -712,6 +731,7 @@ class Server(object):
                 start_time = datetime.datetime.now() 
                 
                 while True:
+                    time.sleep(0.01)
                     try:
                         if table.current_players_count == 1:
                             table.end = True
@@ -758,6 +778,7 @@ class Server(object):
                 
             else:
                 while True:
+                    time.sleep(0.01)
                     for current_player in table.players:
                         if current_player.bet:
                             if current_player.all_in or current_player.discard:
@@ -768,6 +789,7 @@ class Server(object):
                             result = send_json(send_data, conn)
 
                             while True:
+                                time.sleep(0.01)
                                 if table.end or table.end_first:
                                     break
                                 if not current_player.bet:
@@ -783,6 +805,7 @@ class Server(object):
         player.current_bet = 0
 
         while True:
+            time.sleep(0.01)
             if table.second_bet:
                 break
             if table.end:
@@ -791,6 +814,7 @@ class Server(object):
         bet_times = 0   #本轮下注次数
 
         while True:
+            time.sleep(0.01)
 
             if table.end_second or table.end:
                 break
@@ -843,6 +867,7 @@ class Server(object):
                 start_time = datetime.datetime.now() 
                 conn.setblocking(0)
                 while True:
+                    time.sleep(0.01)
                     try:
                         if table.current_players_count == 1:
                             table.end = True
@@ -892,6 +917,7 @@ class Server(object):
                
             else:
                 while True:
+                    time.sleep(0.01)
                     for current_player in table.players:
                         if current_player.bet:
                             if current_player.all_in or current_player.discard:
@@ -904,6 +930,7 @@ class Server(object):
                             result = send_json(send_data, conn)
 
                             while True:
+                                time.sleep(0.01)
                                 if table.end or table.end_second:
                                     break
                                 if not current_player.bet:
@@ -918,6 +945,7 @@ class Server(object):
         player.current_bet = 0
         player.bet_money = 0
         while True:
+            time.sleep(0.01)
             if table.end_bet:
                 break
             if table.end:
@@ -926,7 +954,7 @@ class Server(object):
         bet_times = 0   #本轮下注次数
 
         while True:
-
+            time.sleep(0.01)
             if table.end:
                 break
             #当前下注情况
@@ -980,6 +1008,7 @@ class Server(object):
                 #计时器
                 start_time = datetime.datetime.now() 
                 while True:
+                    time.sleep(0.01)
                     try:
                         if table.current_players_count == 1:
                             break
@@ -1024,6 +1053,7 @@ class Server(object):
                 
             else:
                 while True:
+                    time.sleep(0.01)
                     for current_player in table.players:
                         if current_player.bet:
                             if current_player.all_in or current_player.discard:
@@ -1035,7 +1065,7 @@ class Server(object):
                             result = send_json(send_data, conn)
 
                             while True:
- 
+                                time.sleep(0.01)
                                 if table.end:
                                     break
                                 if not current_player.bet:
@@ -1081,6 +1111,7 @@ class Server(object):
             print({'players_count':table.players_count})
             flag =1
             while True:
+                time.sleep(0.01)
 
                 if table.current_players_count <= 0:
                     return -1
@@ -1114,6 +1145,7 @@ class Server(object):
     def init_cards(self, table):
        print({'init_cards':table.players})
        while True:
+           time.sleep(0.01)
            if len(table.players) == table.current_players_count:
                break
        if not table.cards_init:
@@ -1148,6 +1180,7 @@ class Server(object):
               
     def end_game(self, conn, table, player):
         while True:
+            time.sleep(0.01)
             if table.end:
                 if table.end_num == 1:
                     results = [] 
@@ -1169,6 +1202,7 @@ class Server(object):
                                 results_fail.append(result)
                     else:
                         while True:
+                            time.sleep(0.01)
                             if table.end_done:
                                 for win_player in table.players:
                                     if win_player not in table.discard_players:
